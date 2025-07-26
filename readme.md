@@ -4,7 +4,7 @@ This is a tool for timing rooms and segments in LADX for speedrun practice. The 
 
 ## How to use
 
-1. Download the repository and unzip it
+1. Grab the latest release and unzip it
 
 2. Have python installed
 
