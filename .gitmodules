@@ -1,0 +1,6 @@
+[submodule "keyboard"]
+	path = keyboard
+	url = https://github.com/boppreh/keyboard
+[submodule "pyevilemu"]
+	path = pyevilemu
+	url = https://github.com/daid/pyevilemu
