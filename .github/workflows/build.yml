@@ -6,99 +6,94 @@ on:
       - '**'
 
 jobs:
-  parse-version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      upload-url: ${{ steps.create-release.outputs.upload_url }}
+  build-and-release:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            exe-name: timer-linux
+            runner: ubuntu-latest
+          - os: windows-latest
+            exe-name: timer-windows.exe
+            runner: windows-latest
+          - os: macos-latest
+            exe-name: timer-macos
+            runner: macos-latest
+
+    runs-on: ${{ matrix.runner }}
+    
     steps:
-      - name: Checkout all the submodules
-        uses: actions/checkout@v2
+      - name: Checkout code with submodules
+        uses: actions/checkout@v4
         with:
           submodules: recursive
-      - id: version
-        run: echo "version=$(git describe --exact-match --tags)" >> "$GITHUB_OUTPUT"
-      - run: echo ${{ steps.version.outputs.version }} > timer-version
-      - uses: ncipollo/release-action@v1.16.0
-        id: create-release
+
+      - name: Parse Version
+        id: version
+        run: |
+          # Get the tag name (e.g., v1.0.0)
+          TAG=${{ github.ref_name }}
+          # Remove 'v' prefix if present
+          VERSION=${TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Creating timer-version file..."
+          echo "$VERSION" > timer-version
+
+      - name: Prepare Directory Structure
+        run: |
+          # Move pyevilemu to evilemu to match timer.spec
+          if [ -d "pyevilemu" ]; then
+            mv pyevilemu evilemu
+          fi
+          # Verify files exist for PyInstaller
+          ls -la timer.py
+          ls -la timer-version
+          ls -la evilemu/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          draft: true
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Install PyInstaller if not in requirements
+          pip install pyinstaller
+
+      - name: Build Executable
+        run: |
+          pyinstaller timer.spec --clean
+
+      - name: Rename Executable
+        run: |
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            mv dist/timer.exe ${{ matrix.exe-name }}
+          else
+            mv dist/timer ${{ matrix.exe-name }}
+          fi
+
+      - name: Create Release (if not exists)
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
           name: Timer ${{ steps.version.outputs.version }}
-      - run: mv pyevilemu/evilemu . ; rm -rf pyevilemu
-      - name: Upload timer
-        uses: actions/upload-artifact@v4
-        with:
-          name: timer-source
-          path: '.'
-          include-hidden-files: true
-      - run: zip -r timer-source.zip .
-      - name: Upload to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: ${{ format('gh release upload {0} timer-source.zip', github.ref_name) }}
+          draft: true
+          allowUpdates: true
+          omitBodyDuringUpdate: true
+          omitNameDuringUpdate: true
+          omitPrereleaseDuringUpdate: true
 
-  build-timer-linux:
-    runs-on: ubuntu-latest
-    needs: parse-version
-    steps:
-      - name: Download timer
-        uses: actions/download-artifact@v4
-        with:
-          name: timer-source
-          path: '.'
-      - name: Create executable
-        id: build
-        uses: kbranch/pyinstaller-action@main
-        with:
-          python_ver: '3.12'
-          spec: 'timer.spec'
-          requirements: 'requirements.txt'
-      - run: ${{ format('mv "{0}/timer" ./timer-linux', steps.build.outputs.executable_path) }}
-      - name: Upload to release
+      - name: Upload Artifact to Release
+        uses: actions/upload-release-asset@v1
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: ${{ format('gh release upload {0} timer-linux', github.ref_name) }}
-
-  build-timer-windows:
-    runs-on: windows-latest
-    needs: parse-version
-    steps:
-      - name: Download timer
-        uses: actions/download-artifact@v4
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: timer-source
-          path: '.'
-      - name: Create executable
-        id: build
-        uses: kbranch/pyinstaller-action@main
-        with:
-          python_ver: '3.12'
-          spec: 'timer.spec'
-          requirements: 'requirements.txt'
-      - run: ${{ format('mv "{0}\timer.exe" .\timer-windows.exe', steps.build.outputs.executable_path) }}
-      - name: Upload to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: ${{ format('gh release upload {0} timer-windows.exe', github.ref_name) }}
-
-  build-timer-macos:
-    runs-on: macos-latest
-    needs: parse-version
-    steps:
-      - name: Download timer
-        uses: actions/download-artifact@v4
-        with:
-          name: timer-source
-          path: '.'
-      - name: Create executable
-        id: build
-        uses: kbranch/pyinstaller-action@main
-        with:
-          python_ver: '3.12'
-          spec: 'timer.spec'
-          requirements: 'requirements.txt'
-      - run: ${{ format('mv "{0}/timer" ./timer-macos', steps.build.outputs.executable_path) }}
-      - name: Upload to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: ${{ format('gh release upload {0} timer-macos', github.ref_name) }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./${{ matrix.exe-name }}
+          asset_name: ${{ matrix.exe-name }}
+          asset_content_type: application/octet-stream
