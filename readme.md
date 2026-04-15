@@ -9,3 +9,5 @@ Uses a lot of stuff from from https://github.com/kbranch/Magpie-LADX-Autotracker
 Use [BGB](https://bgb.bircd.org/#downloads) or Retroarch.
 
 On Retroarch you'll need to enable network commands and use sameboy or gambatte.
+
+Run the timer in a terminal.

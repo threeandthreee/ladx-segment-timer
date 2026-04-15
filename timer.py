@@ -75,8 +75,6 @@ with RawInput():
             key = get_non_blocking_key()
             if key == ' ':
                 seg_reset = True
-            elif key == 'q':
-                break
 
             current_room = gb.readRam(0xFFF6, 2)
             if current_room != last_room:
