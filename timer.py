@@ -2,29 +2,31 @@ import time
 import os
 import sys
 import select
-import termios
-import tty
 from gameboy import Gameboy
 
+# --- Cross-Platform Terminal Input Helper ---
 class RawInput:
     def __init__(self):
         self.fd = sys.stdin.fileno()
         self.old_settings = None
+        self.is_windows = (os.name == 'nt')
 
     def __enter__(self):
-        if os.name == 'nt':
-            # Windows doesn't need termios, but we might need msvcrt setup if using it later
-            return self
+        if self.is_windows:
+            # Windows doesn't need termios/tty setup for basic non-blocking reads
+            # We just need to ensure we don't crash
+            pass
         else:
-            # Save current settings
+            # Linux/macOS setup
+            import termios
+            import tty
             self.old_settings = termios.tcgetattr(self.fd)
-            # Set cbreak mode: keys are sent immediately, no line buffering
             tty.setcbreak(self.fd)
-            return self
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.old_settings:
-            # Restore original settings
+            import termios
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
 
 def kbhit():
@@ -33,7 +35,7 @@ def kbhit():
         import msvcrt
         return msvcrt.kbhit()
     else:
-        # Check if stdin has data ready
+        # Linux/macOS
         return select.select([sys.stdin], [], [], 0)[0]
 
 def get_non_blocking_key():
@@ -43,6 +45,7 @@ def get_non_blocking_key():
             import msvcrt
             return msvcrt.getch().decode('utf-8')
         else:
+            # Linux/macOS
             return sys.stdin.read(1)
     return None
 
