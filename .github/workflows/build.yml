@@ -13,15 +13,12 @@ jobs:
           - os: ubuntu-latest
             runner: ubuntu-latest
             exe-name: timer-linux
-            shell: bash
           - os: windows-latest
             runner: windows-latest
             exe-name: timer-windows.exe
-            shell: pwsh # Use PowerShell explicitly for Windows steps
           - os: macos-latest
             runner: macos-latest
             exe-name: timer-macos
-            shell: bash
 
     runs-on: ${{ matrix.runner }}
     
@@ -31,36 +28,28 @@ jobs:
         with:
           submodules: recursive
 
+      # Force bash for version parsing to avoid PowerShell syntax errors
       - name: Parse Version
         id: version
-        shell: ${{ matrix.shell }}
+        shell: bash
         run: |
-          # Get the tag name (e.g., v1.0.0)
           TAG="${{ github.ref_name }}"
-          
-          # Remove 'v' prefix if present (Bash style)
+          # Remove 'v' prefix if present
           if [[ "$TAG" == v* ]]; then
             VERSION="${TAG#v}"
           else
             VERSION="$TAG"
           fi
-          
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Creating timer-version file..."
           echo "$VERSION" > timer-version
 
       - name: Prepare Directory Structure
-        shell: ${{ matrix.shell }}
+        shell: bash
         run: |
-          # Move pyevilemu to evilemu to match timer.spec
           if [ -d "pyevilemu" ]; then
             mv pyevilemu evilemu
           fi
-          
-          # Verify files exist for PyInstaller
-          ls -la timer.py
-          ls -la timer-version
-          ls -la evilemu/ || echo "Warning: evilemu folder not found"
+          ls -la timer.py timer-version evilemu/ || echo "Check paths"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -68,19 +57,19 @@ jobs:
           python-version: '3.12'
 
       - name: Install Dependencies
-        shell: ${{ matrix.shell }}
+        shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build Executable
-        shell: ${{ matrix.shell }}
+        shell: bash
         run: |
           pyinstaller timer.spec --clean
 
       - name: Rename Executable
-        shell: ${{ matrix.shell }}
+        shell: bash
         run: |
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             mv dist/timer.exe ${{ matrix.exe-name }}
@@ -88,7 +77,7 @@ jobs:
             mv dist/timer ${{ matrix.exe-name }}
           fi
 
-      - name: Create Release (if not exists)
+      - name: Create Release
         id: create_release
         uses: ncipollo/release-action@v1
         with:
@@ -100,7 +89,6 @@ jobs:
           omitBodyDuringUpdate: true
           omitNameDuringUpdate: true
           omitPrereleaseDuringUpdate: true
-          # This step requires "Write" permissions on the repo settings
 
       - name: Upload Artifact to Release
         uses: actions/upload-release-asset@v1
