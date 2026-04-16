@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           if [ -d "pyevilemu" ]; then
-            mv pyevilemu evilemu
+            mv pyevilemu/evilemu evilemu
           fi
           ls -la timer.py timer-version evilemu/ || echo "Check paths"
 

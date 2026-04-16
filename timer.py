@@ -51,7 +51,6 @@ def get_non_blocking_key():
 
 gb = Gameboy()
 
-print("Looking for bgb or retroarch...")
 while not gb.findEmulator():
     time.sleep(1)
     
@@ -60,7 +59,7 @@ room_start = time.perf_counter()
 seg_start = time.perf_counter()
 seg_reset = True
 
-print("Press space to reset segment, q to quit.")
+print("Press space to reset segment.")
 print("Timers update on room transition.", end="", flush=True)
 
 def format_elapsed(start, end):
